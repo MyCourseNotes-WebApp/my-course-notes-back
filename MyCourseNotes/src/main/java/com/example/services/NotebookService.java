@@ -21,13 +21,16 @@ public class NotebookService {
 		this.nDao = nDao;
 	}
 	
-	//Method to find notebook by user
+	//Method to find notebook(s) by an user
 	public List<Notebook> findNotebooksByUser(long userId) {
 		return nDao.findAllNotebooksByUser(uDao.findById(userId).get());
 		
 	}
 	
 	public Optional<Notebook> findNotebookById(long notebookId) {
+//		Optional<Notebook> o = nDao.findById(notebookId);
+//		o.get().setUserId(nDao.findById(notebookId).get().getUserId());
+		
 		return nDao.findById(notebookId);
 	}
 	
