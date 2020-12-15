@@ -20,14 +20,152 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.models.User;
 import com.example.repositories.IUserDAO;
+import com.example.services.UserService;
 
 @CrossOrigin
 @RestController
 @RequestMapping(value="/user")
 public class UserController {
 	
-	private IUserDAO uDao;
+	//@Autowired
+	//private IUserDAO uDao;
 	
+	@Autowired
+	UserService us; 
+	
+	// Bcrypt encryption for user password
+    //BCryptPasswordEncoder encrypt = new BCryptPasswordEncoder();
+	
+	/**
+	 * 
+	 * @return
+	 *  //GET: http://localhost:8086/mcn/user/all
+	 */
+	@GetMapping(value="/all")
+    public List<User> getAllUsers() {
+    	return us.getAllUsers();
+    }
+	/**
+	 * 
+	 * @param user
+	 * @return user
+	 * //POST: http://localhost:8086/mcn/user/login
+	 * pram body:
+	 *  {
+
+        "userName": "test",
+        "password": "test",
+        "email": "test@mcn.com"
+       }
+	 */
+    @PostMapping(value="/login")
+    public ResponseEntity<User> loginUser(@RequestBody User user) {
+    	User current = this.us.findUserByEmail(user.getEmail().toLowerCase());
+    	//if user email null, then status 204 
+    	if(current == null) {
+    		return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    	}
+    	// if user email, user name, password wrong, then status 204
+    	if(!(user.getEmail().equals(current.getEmail()) 
+    			&& user.getUserName().equals(current.getUserName()) 
+    			&& user.getPassword().equals(current.getPassword()))) {
+    		
+    		return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    	}
+    	//otherwise, return user model
+    	return ResponseEntity.status(HttpStatus.OK).body(current);	
+
+    }
+    
+    /**
+     * 
+     * @param userId
+     * @return user
+     * //POST: http://localhost:8086/mcn/user/1
+     */
+    @PostMapping(value="/{id}")
+    public User findUserById(@PathVariable("id") Long userId) {
+    	User u = this.us.findById(userId);
+    	return u;
+    }
+	
+	/**
+	 * 
+	 * @param user
+	 * @return
+	 * //POST: http://localhost:8086/mcn/user/new
+	 * {
+	    "userName": "test",
+	    "password": "test",
+	    "email": "test@mcn.com"
+      }
+	 */
+	@PostMapping(value="/new")
+    public User createUser(@RequestBody User user) {
+    	
+		user.setUserName(user.getUserName());
+    	
+		// Will encrypt user password for database security
+    	//user.setPassword(encrypt.encode(user.getPassword()));
+		user.setPassword(user.getPassword());
+    	
+    	// sets the email to lowercase to store in the database
+    	user.setEmail(user.getEmail().toLowerCase());
+    	
+        return this.us.createUser(user);
+    }
+   
+	/**
+	 * 
+	 * @param userId
+	 * @param user
+	 * @return updated user 
+	 *  //PUT: http://localhost:8086/mcn/user/5
+    /*
+     * {
+      
+        "userName": "Im updated test",
+        "password": "test",
+        "email": "imupdatetest@mcn.com"
+      }
+     */
+    @PutMapping(value="/{id}")
+	public ResponseEntity<User> updateUser(@PathVariable("id") Long userId, @RequestBody User user){
+		User u = this.us.findById(userId);
+		if(u == null) {
+			return ResponseEntity.status(HttpStatus.NO_CONTENT).build();	
+		}
+		u.setUserName(user.getUserName());
+		u.setEmail(user.getEmail().toLowerCase());
+		u.setPassword(user.getPassword());
+		final User updatedUser = this.us.createUser(u);
+		return ResponseEntity.status(HttpStatus.OK).body(updatedUser);
+	}
+     
+    /**
+     * 
+     * @param userId
+     * @return object of boolean
+     *  //DELETE: http://localhost:8086/mcn/user/4
+     */
+    @DeleteMapping("/{id}")
+	public Map<String, Boolean> deleteUser(@PathVariable("id") Long userId){
+		
+		Optional<User> o = Optional.ofNullable(us.findById(userId));
+		Map<String, Boolean> response = new HashMap<>();
+		
+		if(o.isPresent()) {
+			User u = o.get();				
+			us.deleteUser(u.getUserId());
+			response.put("deleted", Boolean.TRUE);		
+		}else {
+			response.put("could not delete, something went wrong.", Boolean.FALSE);	
+		}
+		return response;
+	}
+}
+	
+/*	
 	@Autowired
 	public UserController(IUserDAO uDao) {
 		super();
@@ -40,7 +178,7 @@ public class UserController {
 	}
 	//GET: http://localhost:8086/mcn/user/1
 	@GetMapping(value="/{id}")
-	public ResponseEntity<User> getUserById(@PathVariable("id") int userId){
+	public ResponseEntity<User> getUserById(@PathVariable("id") Long userId){
 		Optional<User> o = uDao.findById(userId);
 		if(o.isPresent()) {
 			User u = o.get();			
@@ -61,16 +199,22 @@ public class UserController {
 		}
 	}
 	//POST: http://localhost:8086/mcn/user 
-	//JSON Body: { "userName": "new name xxx"}
+	//JSON Body: { "userName": "new name xxx", 
+	//             "password": "password",
+	//             "email": "admin@test.com"
+	//             }
 	@PostMapping
-	public ResponseEntity<List<User>> newUser(@RequestBody User user){
+	public ResponseEntity<List<User>> createUser(@RequestBody User user){
 		uDao.save(user);
 		return ResponseEntity.status(HttpStatus.OK).body(uDao.findAll());
 	}
 	//PUT: http://localhost:8086/mcn/user/1
-	//JSON Body: { "userName": "updated name xxx"}
+	//JSON Body: { "userName": "updated name xxx"
+	//             "password": "password",
+	//             "email": "admin@test.com"
+	//            }
 	@PutMapping(value="/{id}")
-	public ResponseEntity<User> updateUser(@PathVariable("id") int userId, @RequestBody User user){
+	public ResponseEntity<User> updateUser(@PathVariable("id") Long userId, @RequestBody User user){
 		User u = uDao.findByUserId(userId);
 		u.setUserName(user.getUserName());
 		final User updatedUser = uDao.save(u);
@@ -78,7 +222,7 @@ public class UserController {
 	}
 	//DELETE: http://localhost:8086/mcn/user/3
 	@DeleteMapping("/{id}")
-	public Map<String, Boolean> deleteUser(@PathVariable("id") int userId){
+	public Map<String, Boolean> deleteUser(@PathVariable("id") Long userId){
 		
 //		User u = uDao.findByUserId(userId);
 //		uDao.delete(u);
@@ -99,5 +243,17 @@ public class UserController {
 		return response;
 	}
 	
+	//    
+//    @PutMapping(value="/{id}")
+//    public User updateUser(@PathVariable("id") Long userId,@RequestBody User user) {
+//        User u = this.us.findById(userId);
+//        u.setEmail(user.getEmail().toLowerCase());
+//        u.setUserName(user.getUserName());
+//        //password
+//        
+//        this.us.createUser(u);
+//    }
+    
+*/	
 	
-}
+
